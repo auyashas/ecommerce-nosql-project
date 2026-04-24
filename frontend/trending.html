@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trending & Reports – ShopSmart</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+
+<div id="navbar-root"></div>
+
+<main class="container" style="padding-bottom:3rem">
+
+  <!-- Trending Now -->
+  <div class="section-title" style="margin-top:2rem">🔥 Trending Now <span style="font-size:.85rem;font-weight:400;color:var(--muted)">(resets hourly)</span></div>
+  <div id="trending-root"><div class="spinner"></div></div>
+
+  <!-- Recently Viewed -->
+  <div class="section-title">🕐 Recently Viewed</div>
+  <div id="rv-root"><div class="spinner"></div></div>
+
+  <!-- Reports -->
+  <div class="section-title" style="margin-top:2.5rem">📊 Aggregation Reports</div>
+  <div style="display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem">
+    <button class="btn btn-outline btn-sm" onclick="loadReport('best-selling')">Best Selling</button>
+    <button class="btn btn-outline btn-sm" onclick="loadReport('best-selling-by-category')">By Category</button>
+    <button class="btn btn-outline btn-sm" onclick="loadReport('monthly-revenue')">Monthly Revenue</button>
+    <button class="btn btn-outline btn-sm" onclick="loadReport('low-rated')">Low Rated</button>
+    <button class="btn btn-outline btn-sm" onclick="loadReport('stock-summary')">Stock Summary</button>
+  </div>
+  <div id="report-root"></div>
+
+</main>
+
+<script src="static/js/api.js"></script>
+<script src="static/js/utils.js"></script>
+<script>
+  document.getElementById("navbar-root").innerHTML = renderNavbar("Trending");
+  refreshCartBadge();
+
+  // ── Trending ──────────────────────────────────────────────────────────────
+  async function loadTrending() {
+    const root = document.getElementById("trending-root");
+    try {
+      const data = await Trending.get();
+      if (!data.trending.length) {
+        root.innerHTML = `<div style="color:var(--muted);font-size:.9rem">No trending data yet. Browse some products!</div>`;
+        return;
+      }
+      root.innerHTML = `<div class="trending-list">
+        ${data.trending.map((t, i) => `
+          <a href="product.html?id=${t.product_id}" class="trending-item">
+            <div class="trending-rank ${i < 3 ? 'top3' : ''}">#${i + 1}</div>
+            <div class="trending-info">
+              <div class="trending-name">${t.name}</div>
+              <div class="trending-score">${t.score} view${t.score !== 1 ? 's' : ''} this hour</div>
+            </div>
+            <div class="trending-price">${t.price ? formatPrice(t.price) : ''}</div>
+          </a>`).join("")}
+      </div>`;
+    } catch (e) {
+      root.innerHTML = `<div style="color:var(--danger)">${e.message}</div>`;
+    }
+  }
+
+  // ── Recently Viewed ───────────────────────────────────────────────────────
+  async function loadRecentlyViewed() {
+    const root = document.getElementById("rv-root");
+    try {
+      const data = await Trending.recentlyViewed();
+      if (!data.recently_viewed.length) {
+        root.innerHTML = `<div style="color:var(--muted);font-size:.9rem">No recently viewed products yet.</div>`;
+        return;
+      }
+      root.innerHTML = `<div class="rv-grid">
+        ${data.recently_viewed.map(p => `
+          <div class="rv-card" onclick="location.href='product.html?id=${p._id}'">
+            <div class="rv-icon">${typeEmoji(p.type)}</div>
+            <div class="rv-name">${p.name}</div>
+            <div class="rv-price">${formatPrice(p.price)}</div>
+          </div>`).join("")}
+      </div>`;
+    } catch (e) {
+      root.innerHTML = `<div style="color:var(--danger)">${e.message}</div>`;
+    }
+  }
+
+  // ── Reports ───────────────────────────────────────────────────────────────
+  const reportFns = {
+    "best-selling":             () => Reports.bestSelling(),
+    "best-selling-by-category": () => Reports.bestSellingByCategory(),
+    "monthly-revenue":          () => Reports.monthlyRevenue(),
+    "low-rated":                () => Reports.lowRated(),
+    "stock-summary":            () => Reports.stockSummary(),
+  };
+
+  const reportTitles = {
+    "best-selling":             "🏆 Best Selling Products",
+    "best-selling-by-category": "📦 Best Selling by Category",
+    "monthly-revenue":          "💰 Monthly Revenue",
+    "low-rated":                "⚠️ Low Rated Products",
+    "stock-summary":            "📋 Stock Summary",
+  };
+
+  async function loadReport(type) {
+    const root = document.getElementById("report-root");
+    root.innerHTML = '<div class="spinner"></div>';
+    try {
+      const data = await reportFns[type]();
+      const key  = Object.keys(data)[0];
+      const rows = data[key];
+
+      if (!rows.length) {
+        root.innerHTML = `<div style="color:var(--muted)">No data available.</div>`;
+        return;
+      }
+
+      const cols = Object.keys(rows[0]).filter(k => k !== "_id" || type === "monthly-revenue");
+      root.innerHTML = `
+        <div style="font-weight:700;font-size:1.05rem;margin-bottom:.75rem">${reportTitles[type]}</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:.9rem;background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)">
+            <thead>
+              <tr style="background:var(--bg)">
+                ${cols.map(c => `<th style="padding:.6rem 1rem;text-align:left;font-weight:700;color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)">${c.replace(/_/g," ")}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(row => `
+                <tr style="border-bottom:1px solid var(--border)">
+                  ${cols.map(c => {
+                    let val = row[c];
+                    if (typeof val === "object" && val !== null) val = JSON.stringify(val);
+    if (typeof val === "number" && (c.includes("revenue") || c.includes("price"))) val = formatPrice(val);
+                    return `<td style="padding:.6rem 1rem">${val ?? "—"}</td>`;
+                  }).join("")}
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>`;
+    } catch (e) {
+      root.innerHTML = `<div style="color:var(--danger)">${e.message}</div>`;
+    }
+  }
+
+  loadTrending();
+  loadRecentlyViewed();
+  loadReport("best-selling");
+</script>
+</body>
+</html>

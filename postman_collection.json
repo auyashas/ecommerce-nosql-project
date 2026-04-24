@@ -1,0 +1,277 @@
+{
+  "info": {
+    "name": "ShopSmart E-Commerce API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5000" },
+    { "key": "user_id",  "value": "user_demo_001" },
+    { "key": "product_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/",
+        "description": "Returns all available endpoints."
+      }
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "List All Products",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/products",
+            "description": "Returns all products (Polymorphic Pattern)."
+          }
+        },
+        {
+          "name": "Filter – Electronics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products?type=electronics",
+              "query": [{ "key": "type", "value": "electronics" }]
+            }
+          }
+        },
+        {
+          "name": "Filter – Books",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products?type=book",
+              "query": [{ "key": "type", "value": "book" }]
+            }
+          }
+        },
+        {
+          "name": "Filter – Clothing",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products?type=clothing",
+              "query": [{ "key": "type", "value": "clothing" }]
+            }
+          }
+        },
+        {
+          "name": "Filter – Price Range",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products?min_price=20&max_price=100",
+              "query": [
+                { "key": "min_price", "value": "20" },
+                { "key": "max_price", "value": "100" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter – Min Rating 4",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products?min_rating=4",
+              "query": [{ "key": "min_rating", "value": "4" }]
+            }
+          }
+        },
+        {
+          "name": "Sort – Best Selling",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products?sort_by=computed.total_sold&order=-1",
+              "query": [
+                { "key": "sort_by", "value": "computed.total_sold" },
+                { "key": "order",   "value": "-1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Product Detail (triggers view counter + trending)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/products/{{product_id}}",
+            "header": [{ "key": "X-User-Id", "value": "{{user_id}}" }],
+            "description": "Replace {{product_id}} with a real _id from the list response."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Add to Cart",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/cart/add",
+            "header": [
+              { "key": "X-User-Id",     "value": "{{user_id}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{product_id}}\",\n  \"qty\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Cart Item Qty",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/cart/update",
+            "header": [
+              { "key": "X-User-Id",    "value": "{{user_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{product_id}}\",\n  \"qty\": 3\n}"
+            }
+          }
+        },
+        {
+          "name": "Remove Cart Item",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/cart/remove",
+            "header": [
+              { "key": "X-User-Id",    "value": "{{user_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{product_id}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/cart",
+            "header": [{ "key": "X-User-Id", "value": "{{user_id}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Checkout",
+      "item": [
+        {
+          "name": "Place Order (Redis → MongoDB)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/checkout",
+            "header": [
+              { "key": "X-User-Id",    "value": "{{user_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "description": "Reads cart from Redis, validates stock, creates MongoDB order, $inc computed fields, deletes Redis cart."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "Get Product Reviews",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products/{{product_id}}/reviews?page=1&limit=10",
+              "query": [
+                { "key": "page",  "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Submit Review",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/products/{{product_id}}/reviews",
+            "header": [
+              { "key": "X-User-Id",    "value": "{{user_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"text\": \"Excellent product, highly recommended!\"\n}"
+            },
+            "description": "Submits a review and recomputes avg_rating + review_count via aggregation pipeline."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart – Clear",
+      "item": [
+        {
+          "name": "Clear Entire Cart",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/cart/clear",
+            "header": [{ "key": "X-User-Id", "value": "{{user_id}}" }]
+          }
+        }
+      ]
+    },
+      "item": [
+        {
+          "name": "Get Trending (Top 10)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/trending",
+            "description": "Sorted Set ZREVRANGE – resets hourly."
+          }
+        },
+        {
+          "name": "Get Recently Viewed",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/recently-viewed",
+            "header": [{ "key": "X-User-Id", "value": "{{user_id}}" }],
+            "description": "List LRANGE – last 10 products viewed by user."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Aggregation Reports",
+      "item": [
+        {
+          "name": "Best Selling Products",
+          "request": { "method": "GET", "url": "{{base_url}}/reports/best-selling" }
+        },
+        {
+          "name": "Best Selling by Category",
+          "request": { "method": "GET", "url": "{{base_url}}/reports/best-selling-by-category" }
+        },
+        {
+          "name": "Monthly Revenue",
+          "request": { "method": "GET", "url": "{{base_url}}/reports/monthly-revenue" }
+        },
+        {
+          "name": "Low Rated Products",
+          "request": { "method": "GET", "url": "{{base_url}}/reports/low-rated" }
+        },
+        {
+          "name": "Stock Summary",
+          "request": { "method": "GET", "url": "{{base_url}}/reports/stock-summary" }
+        }
+      ]
+    }
+  ]
+}

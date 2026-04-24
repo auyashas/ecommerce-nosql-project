@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkout – ShopSmart</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+
+<div id="navbar-root"></div>
+
+<main class="container">
+  <div class="checkout-layout">
+    <div id="checkout-root"><div class="spinner"></div></div>
+  </div>
+</main>
+
+<script src="static/js/api.js"></script>
+<script src="static/js/utils.js"></script>
+<script>
+  document.getElementById("navbar-root").innerHTML = renderNavbar();
+  refreshCartBadge();
+
+  async function loadCheckout() {
+    const root = document.getElementById("checkout-root");
+    try {
+      const data = await Cart.get();
+      if (!data.cart.length) {
+        root.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🛒</div>
+            <h2>Your cart is empty</h2>
+            <a href="index.html" class="btn btn-primary" style="margin-top:1rem">Shop Now</a>
+          </div>`;
+        return;
+      }
+
+      root.innerHTML = `
+        <div class="checkout-card">
+          <h2>Review Your Order</h2>
+          <div class="checkout-items">
+            ${data.cart.map(i => `
+              <div class="checkout-item">
+                <div>
+                  <span class="ci-name">${i.name}</span>
+                  <span class="ci-qty"> ×${i.qty}</span>
+                </div>
+                <span>${formatPrice(i.line_total)}</span>
+              </div>`).join("")}
+          </div>
+          <div class="checkout-total">
+            <span>Total</span>
+            <span>${formatPrice(data.total)}</span>
+          </div>
+          <button class="btn btn-success" style="width:100%;justify-content:center" onclick="placeOrder()">
+            ✅ Place Order
+          </button>
+          <a href="cart.html" class="btn btn-outline" style="width:100%;justify-content:center;margin-top:.5rem">
+            ← Back to Cart
+          </a>
+        </div>`;
+    } catch (e) {
+      root.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2>${e.message}</h2></div>`;
+    }
+  }
+
+  async function placeOrder() {
+    try {
+      const order = await Checkout.place();
+      showToast("Order placed successfully!", "success", 5000);
+      refreshCartBadge();
+      document.getElementById("checkout-root").innerHTML = `
+        <div class="checkout-card" style="text-align:center">
+          <div style="font-size:4rem;margin-bottom:1rem">✅</div>
+          <h2 style="color:var(--success);margin-bottom:.5rem">Order Placed!</h2>
+          <p style="color:var(--muted);margin-bottom:1.5rem">
+            Order ID: <strong>${order.order._id}</strong><br>
+            Total: <strong>${formatPrice(order.order.total_amount)}</strong>
+          </p>
+          <a href="index.html" class="btn btn-primary" style="width:100%;justify-content:center">
+            Continue Shopping
+          </a>
+        </div>`;
+    } catch (e) {
+      showToast(e.message, "error", 5000);
+    }
+  }
+
+  loadCheckout();
+</script>
+</body>
+</html>

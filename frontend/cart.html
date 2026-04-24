@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cart – ShopSmart</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+
+<div id="navbar-root"></div>
+
+<main class="container">
+  <div class="page-header">
+    <h1>🛒 Shopping Cart</h1>
+    <div style="display:flex;gap:.75rem">
+      <button class="btn btn-danger btn-sm" onclick="clearCart()">🗑 Clear Cart</button>
+      <a href="index.html" class="btn btn-outline btn-sm">← Continue Shopping</a>
+    </div>
+  </div>
+
+  <div id="cart-root"><div class="spinner"></div></div>
+</main>
+
+<script src="static/js/api.js"></script>
+<script src="static/js/utils.js"></script>
+<script>
+  document.getElementById("navbar-root").innerHTML = renderNavbar("Cart");
+  refreshCartBadge();
+
+  async function loadCart() {
+    const root = document.getElementById("cart-root");
+    try {
+      const data = await Cart.get();
+      if (!data.cart.length) {
+        root.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🛒</div>
+            <h2>Your cart is empty</h2>
+            <p>Browse the catalog and add some items!</p>
+            <a href="index.html" class="btn btn-primary" style="margin-top:1rem">Shop Now</a>
+          </div>`;
+        return;
+      }
+
+      const ttlHours = Math.floor(data.ttl_seconds / 3600);
+      const ttlMins  = Math.floor((data.ttl_seconds % 3600) / 60);
+
+      root.innerHTML = `
+        <div class="cart-layout">
+          <div>
+            <div class="cart-items" id="cart-items">
+              ${data.cart.map(cartItemHtml).join("")}
+            </div>
+            <div style="margin-top:.75rem;font-size:.82rem;color:var(--muted)">
+              ⏱ Cart expires in ${ttlHours}h ${ttlMins}m (24h abandoned cart cleanup)
+            </div>
+          </div>
+          <div class="order-summary">
+            <h2>Order Summary</h2>
+            ${data.cart.map(i => `
+              <div class="summary-row">
+                <span>${i.name} ×${i.qty}</span>
+                <span>${formatPrice(i.line_total)}</span>
+              </div>`).join("")}
+            <div class="summary-row total">
+              <span>Total</span>
+              <span>${formatPrice(data.total)}</span>
+            </div>
+            <a href="checkout.html" class="btn btn-success" style="width:100%;justify-content:center;margin-top:1rem">
+              Proceed to Checkout →
+            </a>
+          </div>
+        </div>`;
+    } catch (e) {
+      root.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2>${e.message}</h2></div>`;
+    }
+  }
+
+  function cartItemHtml(item) {
+    return `
+      <div class="cart-item" id="item-${item.product_id}">
+        <div class="item-icon">${typeEmoji(item.type)}</div>
+        <div class="item-info">
+          <div class="item-name">
+            <a href="product.html?id=${item.product_id}">${item.name}</a>
+          </div>
+          <div class="item-price">${formatPrice(item.price)} each</div>
+          ${item.stock_quantity <= 5 && item.stock_quantity > 0
+            ? `<div style="font-size:.78rem;color:var(--danger)">⚠️ Only ${item.stock_quantity} in stock</div>`
+            : ""}
+        </div>
+        <div class="item-controls">
+          <button class="btn btn-outline btn-sm" onclick="updateQty('${item.product_id}', ${item.qty - 1})">−</button>
+          <span style="font-weight:700;min-width:24px;text-align:center">${item.qty}</span>
+          <button class="btn btn-outline btn-sm" onclick="updateQty('${item.product_id}', ${item.qty + 1})">+</button>
+          <button class="btn btn-danger btn-sm" onclick="removeItem('${item.product_id}')">🗑</button>
+        </div>
+        <div class="item-total">${formatPrice(item.line_total)}</div>
+      </div>`;
+  }
+
+  async function updateQty(productId, newQty) {
+    try {
+      await Cart.update(productId, newQty);
+      loadCart();
+      refreshCartBadge();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  }
+
+  async function removeItem(productId) {
+    try {
+      await Cart.remove(productId);
+      showToast("Item removed from cart");
+      loadCart();
+      refreshCartBadge();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  }
+
+  async function clearCart() {
+    try {
+      await apiFetch("/cart/clear", { method: "POST" });
+      showToast("Cart cleared");
+      loadCart();
+      refreshCartBadge();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  }
+
+  function apiFetch(path, options = {}) {
+    const base = (location.protocol === "file:") ? "http://localhost:5000" : (location.port === "5000" ? "" : "http://localhost:5000");
+    return fetch(base + path, {
+      ...options,
+      headers: { "Content-Type": "application/json", "X-User-Id": getUserId(), ...(options.headers||{}) },
+    }).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error||"Error"); return d; });
+  }
+
+  loadCart();
+</script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShopSmart – Product Catalog</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+
+<div id="navbar-root"></div>
+
+<main class="container">
+  <div class="page-header">
+    <h1>Product Catalog</h1>
+    <span id="product-count" style="color:var(--muted);font-size:.9rem"></span>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="filter-group">
+      <label>Type</label>
+      <select id="f-type">
+        <option value="">All Types</option>
+        <option value="electronics">Electronics</option>
+        <option value="book">Books</option>
+        <option value="clothing">Clothing</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Category</label>
+      <input id="f-category" type="text" placeholder="e.g. Audio" />
+    </div>
+    <div class="filter-group">
+      <label>Brand</label>
+      <input id="f-brand" type="text" placeholder="e.g. Sony" />
+    </div>
+    <div class="filter-group">
+      <label>Min Price (₹)</label>
+      <input id="f-min-price" type="number" min="0" placeholder="0" />
+    </div>
+    <div class="filter-group">
+      <label>Max Price (₹)</label>
+      <input id="f-max-price" type="number" min="0" placeholder="200000" />
+    </div>
+    <div class="filter-group">
+      <label>Min Rating</label>
+      <select id="f-rating">
+        <option value="">Any</option>
+        <option value="4">4★ & up</option>
+        <option value="3">3★ & up</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Sort By</label>
+      <select id="f-sort">
+        <option value="created_at">Newest</option>
+        <option value="price">Price ↑</option>
+        <option value="computed.avg_rating">Rating</option>
+        <option value="computed.total_sold">Best Selling</option>
+      </select>
+    </div>
+    <div class="filter-group" style="justify-content:flex-end">
+      <button class="btn btn-primary" onclick="loadProducts()">Apply</button>
+    </div>
+  </div>
+
+  <!-- Product Grid -->
+  <div id="product-grid" class="product-grid">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Recently Viewed -->
+  <div id="rv-section" style="display:none">
+    <div class="section-title">🕐 Recently Viewed</div>
+    <div id="rv-grid" class="rv-grid"></div>
+  </div>
+</main>
+
+<script src="static/js/api.js"></script>
+<script src="static/js/utils.js"></script>
+<script>
+  document.getElementById("navbar-root").innerHTML = renderNavbar("Catalog");
+
+  async function loadProducts() {
+    const grid = document.getElementById("product-grid");
+    grid.innerHTML = '<div class="spinner"></div>';
+    try {
+      const data = await Products.list({
+        type:       document.getElementById("f-type").value,
+        category:   document.getElementById("f-category").value,
+        brand:      document.getElementById("f-brand").value,
+        min_price:  document.getElementById("f-min-price").value,
+        max_price:  document.getElementById("f-max-price").value,
+        min_rating: document.getElementById("f-rating").value,
+        sort_by:    document.getElementById("f-sort").value,
+        order:      document.getElementById("f-sort").value === "price" ? 1 : -1,
+      });
+      document.getElementById("product-count").textContent =
+        `${data.count} product${data.count !== 1 ? "s" : ""} found`;
+      grid.innerHTML = data.products.length
+        ? data.products.map(productCard).join("")
+        : `<div class="empty-state" style="grid-column:1/-1">
+             <div class="empty-icon">🔍</div>
+             <h2>No products found</h2>
+             <p>Try adjusting your filters.</p>
+           </div>`;
+    } catch (e) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-icon">⚠️</div><h2>Failed to load products</h2>
+        <p>${e.message}</p></div>`;
+    }
+  }
+
+  function productCard(p) {
+    const rating = p.computed?.avg_rating || 0;
+    const sold   = p.computed?.total_sold || 0;
+    const stock  = p.stock_quantity;
+    const lowStock = stock > 0 && stock <= 5;
+    const outOfStock = stock === 0;
+
+    return `
+      <div class="product-card">
+        <a href="product.html?id=${p._id}" style="display:contents">
+          <div class="card-img">${typeEmoji(p.type)}</div>
+          <div class="card-body">
+            <span class="card-type badge badge-${p.type === 'book' ? 'book' : p.type === 'clothing' ? 'clothing' : 'electronics'}">${p.type}</span>
+            <div class="card-name">${p.name}</div>
+            <div class="card-brand">${p.brand}</div>
+            ${rating > 0 ? `<div class="card-rating">${renderStars(rating)} <span style="color:var(--muted)">(${p.computed.review_count})</span></div>` : ""}
+            ${sold > 0 ? `<div style="font-size:.78rem;color:var(--muted)">${sold} sold</div>` : ""}
+            <div class="card-price">${formatPrice(p.price)}</div>
+            <div class="card-stock ${lowStock ? 'low' : ''}">
+              ${outOfStock ? '❌ Out of stock' : lowStock ? `⚠️ Only ${stock} left` : `✅ In stock (${stock})`}
+            </div>
+          </div>
+        </a>
+        <div class="card-footer">
+          <button class="btn btn-primary btn-sm" style="flex:1"
+            onclick="addToCart('${p._id}', '${p.name}', ${outOfStock})"
+            ${outOfStock ? 'disabled' : ''}>
+            🛒 Add to Cart
+          </button>
+        </div>
+      </div>`;
+  }
+
+  async function addToCart(productId, name, outOfStock) {
+    if (outOfStock) return;
+    try {
+      await Cart.add(productId, 1);
+      showToast(`"${name}" added to cart`, "success");
+      refreshCartBadge();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  }
+
+  async function loadRecentlyViewed() {
+    try {
+      const data = await Trending.recentlyViewed();
+      if (!data.recently_viewed.length) return;
+      const section = document.getElementById("rv-section");
+      const grid    = document.getElementById("rv-grid");
+      section.style.display = "block";
+      grid.innerHTML = data.recently_viewed.map(p => `
+        <div class="rv-card" onclick="location.href='product.html?id=${p._id}'">
+          <div class="rv-icon">${typeEmoji(p.type)}</div>
+          <div class="rv-name">${p.name}</div>
+          <div class="rv-price">${formatPrice(p.price)}</div>
+        </div>`).join("");
+    } catch (_) {}
+  }
+
+  loadProducts();
+  loadRecentlyViewed();
+  refreshCartBadge();
+</script>
+</body>
+</html>
