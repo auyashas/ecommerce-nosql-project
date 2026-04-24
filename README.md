@@ -147,3 +147,4 @@ All cart/checkout/recently-viewed endpoints require `X-User-Id` header.
 ---
 
 ## Postman Collection
+Import `postman_collection.json`. Set the `product_id` variable to any `_id` from `GET /products`.
